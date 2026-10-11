@@ -1,0 +1,996 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Оптическая скамья</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* Раскладка: широкая 3D-сцена оптической скамьи (линза слева в центре, матрица на салазках справа), подписи привязаны к точкам сцены. Ниже настройки, видоискатель и числа. Единая тёмная студийная тема. */
+:root {
+  color-scheme: dark;
+  --bg: #090C10;
+  --panel: #10151B;
+  --edge: #212A34;
+  --fg: #ECF0F4;
+  --muted: #8C98A5;
+  --amber: #FFB84D;
+  --cyan: #5EE6D2;
+  --coral: #FF6B5E;
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); line-height: 1.55; padding-inline: 1rem; padding-block: 0; }
+.wrap { max-width: 72rem; margin-inline: auto; padding-block: 2rem 3.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber); margin: 0 0 0.8rem; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(2.2rem, 7vw, 4.2rem); line-height: 0.98; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 40rem; margin: 1rem 0 0; text-wrap: pretty; }
+h2 { font-family: var(--f-mono); font-weight: 600; font-size: 0.74rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); margin: 0 0 0.8rem; }
+
+/* Сцена */
+.stage { position: relative; overflow: hidden; border: 1px solid var(--edge); background: radial-gradient(120% 90% at 50% 40%, #151C24 0%, #0A0D11 70%); aspect-ratio: 16 / 9; max-height: 80vh; min-height: 20rem; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+.hud { position: absolute; left: 0.9rem; right: 0.9rem; top: 0.8rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; pointer-events: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip { font-family: var(--f-mono); font-size: 0.78rem; padding: 0.28rem 0.6rem; border: 1px solid #2B3642; background: rgb(9 12 16 / 0.7); backdrop-filter: blur(6px); }
+.badge { font-family: var(--f-mono); font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.7rem; border: 1px solid var(--coral); color: var(--coral); background: rgb(9 12 16 / 0.7); }
+.badge.ok { border-color: var(--cyan); color: var(--cyan); }
+.lbl { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: #C9D3DC; padding: 0.15rem 0.45rem; background: rgb(9 12 16 / 0.62); border: 1px solid #2B3642; pointer-events: none; white-space: nowrap; will-change: transform; }
+.lbl.acc { color: var(--cyan); border-color: #1F6D63; }
+.foot { position: absolute; left: 0.9rem; right: 0.9rem; bottom: 0.7rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem 1rem; font-size: 0.74rem; color: var(--muted); pointer-events: none; }
+.views { position: absolute; right: 0.9rem; bottom: 2.4rem; display: flex; gap: 0.3rem; }
+.views .btn { padding: 0.35rem 0.6rem; font-size: 0.72rem; background: rgb(9 12 16 / 0.75); }
+.nogl { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 2rem; color: var(--muted); }
+
+.btn, .tab { font: inherit; font-family: var(--f-mono); font-size: 0.82rem; padding: 0.6rem 0.9rem; background: transparent; color: var(--fg); border: 1px solid #2B3642; cursor: pointer; }
+.btn:hover { border-color: var(--fg); }
+.btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.btn.af { background: var(--amber); border-color: var(--amber); color: #1A1204; font-weight: 600; }
+
+.deck { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.4rem; align-items: start; }
+.card { background: var(--panel); border: 1px solid var(--edge); padding: 1.1rem; min-width: 0; }
+.controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem 1.6rem; }
+.ctl { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.ctl label, .ctl .lab { display: flex; justify-content: space-between; gap: 1rem; font-weight: 500; font-size: 0.93rem; }
+.ctl output { font-family: var(--f-mono); color: var(--amber); font-variant-numeric: tabular-nums; }
+.seg { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.seg .btn { padding: 0.4rem 0.55rem; font-size: 0.76rem; }
+input[type="range"] { width: 100%; accent-color: var(--amber); height: 1.8rem; margin: 0; }
+.hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.scen { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--edge); }
+.scen-text { margin: 0.8rem 0 0; padding: 0.8rem 1rem; border-left: 3px solid var(--amber); background: #0C1015; font-size: 0.93rem; min-height: 4.8rem; }
+
+.shot { border: 1px solid var(--edge); background: #0E1216; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+.shot svg { display: block; width: 100%; height: 100%; }
+.readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.2rem; margin: 1rem 0 0; }
+.rd { padding-block: 0.5rem; border-bottom: 1px solid var(--edge); min-width: 0; }
+.rd dt { font-size: 0.76rem; color: var(--muted); }
+.rd dd { margin: 0; font-family: var(--f-mono); font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.verdict { margin: 0.9rem 0 0; font-size: 0.92rem; color: #C5CED7; min-height: 4.6rem; }
+
+.how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem; border-top: 1px solid var(--edge); padding-top: 1.4rem; }
+.how h3 { font-family: var(--f-display); font-weight: 500; font-size: 1.05rem; margin: 0 0 0.4rem; }
+.how p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+.how code { font-family: var(--f-mono); color: var(--fg); }
+
+html { scroll-behavior: smooth; }
+#stage, #dof, #af { scroll-margin-top: 1rem; }
+@keyframes arrive { from { box-shadow: 0 0 0 2px var(--amber), 0 0 2.2rem rgb(255 184 77 / 0.35); } to { box-shadow: 0 0 0 2px transparent, 0 0 0 rgb(255 184 77 / 0); } }
+.arrive { animation: arrive 1.4s ease-out 0.35s both; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .arrive { animation: none; } }
+.nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.4rem; }
+.nav a { font-family: var(--f-mono); font-size: 0.78rem; letter-spacing: 0.06em; color: var(--fg); text-decoration: none; padding: 0.45rem 0.8rem; border: 1px solid #2B3642; }
+.nav a:hover { border-color: var(--amber); color: var(--amber); }
+.sec-lead { color: #B9C4CE; max-width: 46rem; margin: 0 0 1.1rem; text-wrap: pretty; }
+.pair { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.4rem; align-items: start; margin-top: 1.1rem; }
+.pair > div { min-width: 0; }
+.chart { display: block; width: 100%; height: auto; background: #0C1015; border: 1px solid var(--edge); }
+.sv-t { font-family: var(--f-mono); font-size: 12px; fill: var(--muted); }
+.sv-v { font-family: var(--f-mono); font-size: 13px; font-weight: 600; fill: var(--fg); }
+.sv-c { font-family: var(--f-mono); font-size: 12px; fill: var(--cyan); }
+.sv-a { font-family: var(--f-mono); font-size: 12px; fill: var(--amber); }
+.aflog { list-style: none; margin: 0.8rem 0 0; padding: 0; font-family: var(--f-mono); font-size: 0.78rem; color: #B9C4CE; min-height: 9rem; }
+.aflog li { padding: 0.25rem 0; border-bottom: 1px solid var(--edge); }
+.aflog .up { color: var(--cyan); }
+.aflog .down { color: var(--coral); }
+.steps { margin: 1rem 0 0; padding-left: 1.2rem; color: #B9C4CE; font-size: 0.92rem; }
+.steps li { margin-bottom: 0.45rem; }
+.row-btn { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cmp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; margin-top: 1.4rem; padding-top: 1.2rem; border-top: 1px solid var(--edge); }
+.cmp h3 { font-family: var(--f-display); font-weight: 500; font-size: 1rem; margin: 0 0 0.4rem; }
+.cmp p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.stat { font-family: var(--f-mono); font-size: 0.82rem; color: var(--amber); margin: 0.7rem 0 0; min-height: 1.3rem; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+@media (max-width: 54rem) { .pair, .cmp { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 54rem) { .deck, .how { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 40rem) { .stage { aspect-ratio: 1 / 1; } .controls { grid-template-columns: minmax(0, 1fr); } .views { bottom: 3.4rem; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Интерактив · оптика объектива · 3D</p>
+    <h1>Оптическая скамья</h1>
+    <p class="lead">Свеча слева, стеклянная линза в центре, матрица на салазках справа. Вращайте кольцо фокусировки и смотрите, как пучок лучей собирается в точку или промахивается мимо матрицы. Сцену можно вращать мышью или пальцем.</p>
+    <nav class="nav" aria-label="Разделы"><a href="#stage">3D-сцена</a><a href="#dof">Глубина резкости</a><a href="#af">Автофокус</a></nav>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Трёхмерная сцена: свеча, линза, лучи и матрица на оптической скамье">
+    <canvas id="gl"></canvas>
+    <div class="nogl" id="nogl">Не удалось запустить 3D в этом браузере. Настройки и снимок ниже работают как обычно.</div>
+    <div id="labels">
+      <div class="lbl" id="l-obj">Предмет</div>
+      <div class="lbl" id="l-lens">Линза</div>
+      <div class="lbl acc" id="l-sens">Матрица</div>
+      <div class="lbl" id="l-img">Изображение</div>
+      <div class="lbl acc" id="l-dof">Зона резкости</div>
+    </div>
+    <div class="hud">
+      <div class="chips"><span class="chip" id="c-f">50 мм</span><span class="chip" id="c-n">f/2,8</span><span class="chip" id="c-s">3,0 м</span></div>
+      <div class="badge" id="badge">Мимо фокуса</div>
+    </div>
+    <div class="views" role="group" aria-label="Ракурс">
+      <button class="btn" id="dofbtn" type="button" aria-pressed="true">Зона резкости</button>
+      <button class="btn" type="button" data-view="side">Сбоку</button>
+      <button class="btn" type="button" data-view="iso" aria-pressed="true">Объём</button>
+      <button class="btn" type="button" data-view="top">Сверху</button>
+    </div>
+    <div class="foot"><span>Тяните кольцо линзы, матрицу или свечу. Пустое место поворачивает сцену</span><span>Смещение матрицы от изображения на схеме увеличено в 10 раз</span></div>
+  </section>
+
+  <section class="deck">
+    <div class="card">
+      <h2>Настройки</h2>
+      <div class="controls">
+        <div class="ctl">
+          <label for="f">Фокусное расстояние <output id="o-f">50 мм</output></label>
+          <input id="f" type="range" min="24" max="105" step="1" value="50">
+          <p class="hint">Меньше значение, шире угол кадра.</p>
+        </div>
+        <div class="ctl">
+          <label for="s">Расстояние до предмета <output id="o-s">3,0 м</output></label>
+          <input id="s" type="range" min="0" max="100" step="1" value="60">
+          <p class="hint">На сцене расстояние сжато, числа считаются точно.</p>
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Диафрагма</span><output id="o-n">f/2,8</output></div>
+          <div class="seg" id="apert" role="group" aria-label="Значение диафрагмы"></div>
+          <p class="hint">Чем больше число, тем уже отверстие и тоньше пучок.</p>
+        </div>
+        <div class="ctl">
+          <label for="ring">Кольцо фокусировки <output id="o-ring">наводка на 1,2 м</output></label>
+          <input id="ring" type="range" min="0" max="1000" step="1" value="400">
+          <div class="seg"><button class="btn af" id="af" type="button">Автофокус на предмет</button></div>
+        </div>
+      </div>
+      <div class="scen" role="group" aria-label="Готовые сценарии">
+        <button class="btn" type="button" data-sc="0">1. Резкий кадр</button>
+        <button class="btn" type="button" data-sc="1">2. Наводка мимо</button>
+        <button class="btn" type="button" data-sc="2">3. Закрыли диафрагму</button>
+      </div>
+      <p class="scen-text" id="scen">Выберите сценарий, и настройки выставятся сами. Или крутите кольцо фокусировки вручную.</p>
+    </div>
+
+    <div class="card">
+      <h2>Что увидит матрица</h2>
+      <div class="shot">
+        <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-label="Горящая свеча на столе и точечные огни на фоне">
+          <rect width="400" height="300" fill="#10151B"/>
+          <g id="blurred">
+            <rect x="0" y="210" width="400" height="90" fill="#1B2430"/>
+            <g stroke="#E9EDF0" stroke-width="3">
+              <line x1="40" y1="230" x2="360" y2="230"/><line x1="40" y1="246" x2="360" y2="246"/>
+              <line x1="40" y1="262" x2="360" y2="262"/><line x1="40" y1="278" x2="360" y2="278"/>
+            </g>
+            <defs>
+              <radialGradient id="cGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFC670" stop-opacity="0.55"/><stop offset="0.45" stop-color="#FF9A3C" stop-opacity="0.18"/><stop offset="1" stop-color="#FF9A3C" stop-opacity="0"/></radialGradient>
+              <linearGradient id="cWax" x1="0" x2="1"><stop offset="0" stop-color="#FBF1DA"/><stop offset="0.45" stop-color="#EFDDB8"/><stop offset="1" stop-color="#B89E72"/></linearGradient>
+              <radialGradient id="cFlame" cx="50%" cy="72%" r="62%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.35" stop-color="#FFF0A8"/><stop offset="0.75" stop-color="#FFA52E"/><stop offset="1" stop-color="#E8590C"/></radialGradient>
+              <linearGradient id="cBrass" x1="0" x2="1"><stop offset="0" stop-color="#8A6A2B"/><stop offset="0.4" stop-color="#E5C36A"/><stop offset="1" stop-color="#6F5320"/></linearGradient>
+              <radialGradient id="cTable" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFB45A" stop-opacity="0.45"/><stop offset="1" stop-color="#FFB45A" stop-opacity="0"/></radialGradient>
+            </defs>
+            <ellipse cx="200" cy="215" rx="120" ry="16" fill="url(#cTable)"/>
+            <circle cx="200" cy="72" r="86" fill="url(#cGlow)"/>
+            <path d="M178 112 H222 V204 H178 Z" fill="url(#cWax)"/>
+            <path d="M178 112 V204" stroke="#FFF8E6" stroke-width="1.5" opacity="0.7"/>
+            <ellipse cx="200" cy="112" rx="22" ry="5.5" fill="#F7E4B0"/>
+            <ellipse cx="200" cy="112.5" rx="11" ry="2.6" fill="#E9B857"/>
+            <path d="M179 114 C177 126 182 132 181 144 C180 154 186 158 184 146 C183 134 188 124 186 116 Z" fill="#FFF6DE" opacity="0.9"/>
+            <path d="M221 116 C223 130 218 138 219 150 C220 158 214 160 215 148 C216 136 212 126 214 118 Z" fill="#D9C291" opacity="0.9"/>
+            <path d="M200 110 C199 104 201 98 200 92" stroke="#2A1B10" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+            <path d="M200 42 C189 60 184 74 190 86 C194 95 206 95 210 86 C216 74 211 60 200 42 Z" fill="url(#cFlame)"/>
+            <ellipse cx="200" cy="88" rx="4.2" ry="6" fill="#5FA8FF" opacity="0.55"/>
+            <ellipse cx="200" cy="206" rx="46" ry="9" fill="url(#cBrass)"/>
+            <ellipse cx="200" cy="203" rx="40" ry="6" fill="#F0D68A" opacity="0.55"/>
+            <ellipse cx="200" cy="204" rx="26" ry="3.6" fill="#D6BE76" opacity="0.5"/>
+            <g id="lights"></g>
+          </g>
+        </svg>
+      </div>
+      <dl class="readout">
+        <div class="rd"><dt>Матрица от линзы</dt><dd id="r-d">—</dd></div>
+        <div class="rd"><dt>Резкое изображение на</dt><dd id="r-v">—</dd></div>
+        <div class="rd"><dt>Наводка на</dt><dd id="r-sf">—</dd></div>
+        <div class="rd"><dt>Размытие на матрице</dt><dd id="r-c">—</dd></div>
+      </dl>
+      <p class="verdict" id="verdict"></p>
+    </div>
+  </section>
+
+  <section class="card" id="dof" aria-label="Глубина резкости">
+    <h2>Глубина резкости</h2>
+    <p class="sec-lead">Резкой получается не одна плоскость, а целый слой пространства. Пока размытие на матрице меньше допустимых 30 мкм, глаз считает предмет резким. Этот слой подсвечен голубым на шкале ниже и в 3D-сцене выше. Меняйте диафрагму, фокусное расстояние и наводку и смотрите, как слой растёт и сжимается.</p>
+    <div class="pair">
+      <div>
+        <svg class="chart" id="dofsvg" viewBox="0 0 720 165" role="img" aria-label="Шкала расстояний от 0,3 м до бесконечности с зоной резкости"></svg>
+        <div class="row-btn" style="margin-top: 0.9rem" role="group" aria-label="Сценарии глубины резкости">
+          <button class="btn" type="button" data-dof="0">Портрет, f/2</button>
+          <button class="btn" type="button" data-dof="1">Пейзаж, f/11</button>
+          <button class="btn" type="button" data-dof="2">Близко, f/1,4</button>
+          <button class="btn af" id="hyper" type="button">Гиперфокальная наводка</button>
+        </div>
+        <p class="scen-text" id="dofnote">Выберите сценарий или меняйте настройки выше. Свеча на шкале станет голубой, когда окажется внутри зоны, и красной, когда выйдет из неё.</p>
+      </div>
+      <div>
+        <dl class="readout" style="margin-top: 0">
+          <div class="rd"><dt>Ближняя граница</dt><dd id="d-near">—</dd></div>
+          <div class="rd"><dt>Дальняя граница</dt><dd id="d-far">—</dd></div>
+          <div class="rd"><dt>Глубина зоны</dt><dd id="d-total">—</dd></div>
+          <div class="rd"><dt>Гиперфокальное расстояние</dt><dd id="d-h">—</dd></div>
+        </dl>
+        <p class="verdict" id="dofverdict"></p>
+        <p class="hint">Расчёт: H = f²/(N·c) + f, ближняя граница = s·(H−f)/(H+s−2f), дальняя = s·(H−f)/(H−s). Здесь s расстояние наводки, N число диафрагмы, c = 0,03 мм допустимый кружок размытия. Если s не меньше H, дальняя граница уходит в бесконечность.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="af" aria-label="Автофокус">
+    <h2>Как работает автофокус</h2>
+    <p class="sec-lead">Автофокус должен узнать две вещи: в какую сторону крутить кольцо и когда остановиться. Камеры решают это двумя способами, и оба можно запустить здесь на настоящей сцене выше. Кольцо на 3D-линзе будет поворачиваться само.</p>
+    <div class="row-btn" role="group" aria-label="Тип автофокуса">
+      <button class="btn" type="button" data-af="contrast" aria-pressed="true">Контрастный: ищет пик</button>
+      <button class="btn" type="button" data-af="phase" aria-pressed="false">Фазовый: считает промах</button>
+    </div>
+
+    <div class="pair" id="afc">
+      <div>
+        <svg class="chart" id="afcsvg" viewBox="0 0 640 250" role="img" aria-label="График контраста в зависимости от положения кольца"></svg>
+        <div class="row-btn" style="margin-top: 0.9rem">
+          <button class="btn" id="afshake" type="button">1. Сбить фокус</button>
+          <button class="btn af" id="afhunt" type="button">2. Запустить поиск</button>
+        </div>
+        <p class="stat" id="afcstat"></p>
+      </div>
+      <div>
+        <ol class="steps">
+          <li>Камера считает контраст в выбранном участке кадра. В резком кадре соседние пиксели сильно различаются, в размытом выравниваются.</li>
+          <li>Направление она не знает, поэтому делает пробный шаг кольцом и сравнивает контраст до и после.</li>
+          <li>Контраст вырос: идёт дальше. Упал: разворачивается и берёт шаг вдвое меньше. Такие качания вперёд и назад называют «дыханием».</li>
+          <li>Когда шаг становится совсем малым, кольцо возвращается на лучшую проверенную точку.</li>
+        </ol>
+        <ol class="aflog" id="aflog" aria-live="off"></ol>
+      </div>
+    </div>
+
+    <div class="pair" id="afp" hidden>
+      <div>
+        <svg class="chart" id="afpsvg" viewBox="0 0 640 270" role="img" aria-label="Два пучка света от краёв линзы и два изображения на датчиках автофокуса"></svg>
+        <div class="row-btn" style="margin-top: 0.9rem">
+          <button class="btn" id="afp-shake" type="button">1. Сбить фокус</button>
+          <button class="btn af" id="afp-go" type="button">2. Навести одним движением</button>
+        </div>
+        <p class="stat" id="afpstat"></p>
+      </div>
+      <div>
+        <ol class="steps">
+          <li>Свет от верхнего и нижнего краёв отверстия линзы делится на два пучка. Это два взгляда на предмет с разных сторон.</li>
+          <li>Каждый пучок даёт своё изображение на отдельном датчике. При точном фокусе оба изображения лежат в одном месте.</li>
+          <li>Если матрица стоит не там, изображения разъезжаются. Знак сдвига говорит, куда крутить, а величина сдвига говорит, на сколько.</li>
+          <li>Камера переводит сдвиг в ход мотора и делает одно движение. Потом короткая проверка, и всё.</li>
+        </ol>
+        <p class="hint" id="afpnum"></p>
+      </div>
+    </div>
+
+    <div class="cmp">
+      <div><h3>Контрастный</h3><p>Плюсы: работает прямо по матрице, не требует отдельного датчика, точен на неподвижной сцене. Минусы: медленнее, «дышит», плохо справляется с гладкими однотонными поверхностями и слабым светом.</p></div>
+      <div><h3>Фазовый</h3><p>Плюсы: сразу знает направление и величину промаха, быстрый, подходит для движущихся предметов. Минусы: нужен отдельный датчик или специальные пиксели на матрице и точная калибровка.</p></div>
+      <div><h3>Гибрид</h3><p>Современные камеры сочетают оба. Фаза быстро подводит кольцо почти в точку, контраст доводит последние доли миллиметра и проверяет результат.</p></div>
+    </div>
+  </section>
+
+  <section class="how" aria-label="Пояснения">
+    <div>
+      <h3>Линза собирает свет в точку</h3>
+      <p>Свет от точки предмета проходит через всё отверстие линзы и сходится в одной точке на расстоянии v. Связь такая: <code>1/f = 1/s + 1/v</code>, где s расстояние до предмета.</p>
+    </div>
+    <div>
+      <h3>Фокусировка сдвигает линзу</h3>
+      <p>Матрица неподвижна, а кольцо отодвигает линзу от неё. На скамье для наглядности двигается матрица, оптика получается та же. Кольцо на барабане линзы крутится вместе с ползунком.</p>
+    </div>
+    <div>
+      <h3>Промах даёт круг размытия</h3>
+      <p>Если матрица стоит не в точке схождения, она режет пучок, и каждая точка предмета рисуется кружком. Его размер пропорционален отверстию диафрагмы, поэтому f/16 прощает ошибки наводки.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var SMIN = 500, COC = 0.03, U = 0.04, GAIN = 10;
+  var NSTOPS = [1.4, 2, 2.8, 4, 5.6, 8, 11, 16];
+  var st = { f: 50, sPos: 60, n: 2.8, ring: 0 };
+
+  function fmt(x, d) { return x.toFixed(d).replace(".", ","); }
+  function distText(mm) {
+    if (!isFinite(mm) || mm > 1e6) return "∞";
+    return mm >= 1000 ? fmt(mm / 1000, mm >= 10000 ? 1 : 2) + " м" : fmt(mm, 0) + " мм";
+  }
+  function sOf(pos) { return SMIN * Math.pow(20, pos / 100); }
+  function eMax(f) { return f * f / (SMIN - f); }
+  function ringFor(f, sMm) { var t = (f * f / (sMm - f)) / eMax(f) * 1000; return Math.max(0, Math.min(1000, t)); }
+  function calc() {
+    var f = st.f, s = sOf(st.sPos), A = f / st.n, v = f * s / (s - f);
+    var e = eMax(f) * st.ring / 1000, d = f + e;
+    var c = A * Math.abs(d - v) / v;
+    return { f: f, s: s, A: A, v: v, d: d, c: c, sf: e > 1e-4 ? f * d / (d - f) : Infinity, sharp: c <= COC };
+  }
+
+  /* ---------- Кнопки диафрагмы и сценарии ---------- */
+  function nearestN(n) { var b = 0; NSTOPS.forEach(function (x, i) { if (Math.abs(x - n) < Math.abs(NSTOPS[b] - n)) b = i; }); return b; }
+  function markN() {
+    var all = $("apert").children, k = nearestN(st.n);
+    for (var i = 0; i < all.length; i++) all[i].setAttribute("aria-pressed", i === k ? "true" : "false");
+  }
+  NSTOPS.forEach(function (n) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "btn"; b.textContent = "f/" + String(n).replace(".", ",");
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", function () { st.n = n; markN(); });
+    $("apert").appendChild(b);
+  });
+
+  var tweenId = 0;
+  function tween(to, ms, done) {
+    var from = { f: st.f, sPos: st.sPos, n: st.n, ring: st.ring }, id = ++tweenId, t0 = null;
+    if (reduce) { for (var k in to) st[k] = to[k]; syncInputs(); if (done) done(); return; }
+    function step(ts) {
+      if (id !== tweenId) return;
+      if (t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / ms, 1), e = 1 - Math.pow(1 - p, 3);
+      for (var k in to) st[k] = from[k] + (to[k] - from[k]) * e;
+      syncInputs();
+      if (p < 1) requestAnimationFrame(step); else if (done) done();
+    }
+    requestAnimationFrame(step);
+  }
+  function syncInputs() {
+    $("f").value = Math.round(st.f); $("s").value = Math.round(st.sPos); $("ring").value = Math.round(st.ring); markN();
+  }
+  $("f").addEventListener("input", function () { stopHunt(); tweenId++; st.f = +this.value; });
+  $("s").addEventListener("input", function () { stopHunt(); tweenId++; st.sPos = +this.value; });
+  $("ring").addEventListener("input", function () { stopHunt(); tweenId++; st.ring = +this.value; });
+  $("af").addEventListener("click", function () { stopHunt(); tween({ ring: ringFor(st.f, sOf(st.sPos)) }, 800); });
+
+  var SCEN = [
+    { to: function () { return { f: 50, sPos: 60, n: 2.8, ring: ringFor(50, 3000) }; }, text: "Матрица стоит там, где лучи сходятся в точку. Пятно размытия меньше допустимых 30 мкм, поэтому снимок резкий, а значок над сценой зелёный." },
+    { to: function () { return { f: 50, sPos: 60, n: 2.8, ring: ringFor(50, 1000) }; }, text: "Линза наведена на 1 м, а предмет стоит на 3 м. Лучи сходятся раньше матрицы, а на матрице уже снова расходятся и рисуют пятно. Так выглядит фокус, который «ушёл» в сторону." },
+    { to: function () { return { f: 50, sPos: 60, n: 16, ring: ringFor(50, 1000) }; }, text: "Тот же промах наводки, но диафрагма закрыта до f/16. Пучок стал тоньше, пятно примерно в 5,7 раза меньше, и снимок почти вернулся к резкости." }
+  ];
+  Array.prototype.forEach.call(document.querySelectorAll("[data-sc]"), function (b) {
+    b.addEventListener("click", function () {
+      stopHunt();
+      var sc = SCEN[+b.getAttribute("data-sc")];
+      $("scen").textContent = sc.text;
+      tween(sc.to(), 900);
+    });
+  });
+
+  /* ---------- Видоискатель ---------- */
+  var LIGHTS = [[60, 40], [140, 70], [250, 35], [330, 80], [95, 105], [300, 120], [370, 30], [30, 125]];
+  var NSVG = "http://www.w3.org/2000/svg", lg = $("lights");
+  LIGHTS.forEach(function (p) {
+    var c = document.createElementNS(NSVG, "circle");
+    c.setAttribute("cx", p[0]); c.setAttribute("cy", p[1]); c.setAttribute("r", 3); c.setAttribute("fill", "#FFD27A");
+    lg.appendChild(c);
+  });
+
+  var lastSig = "";
+  function updateDom(m) {
+    var sig = [m.f, st.n.toFixed(2), st.sPos.toFixed(1), st.ring.toFixed(1)].join("|");
+    if (sig === lastSig) return;
+    lastSig = sig;
+    $("o-f").textContent = Math.round(m.f) + " мм"; $("c-f").textContent = Math.round(m.f) + " мм";
+    var nn = "f/" + fmt(st.n, st.n < 10 ? 1 : 0).replace(",0", ""); $("o-n").textContent = nn; $("c-n").textContent = nn;
+    $("o-s").textContent = distText(m.s); $("c-s").textContent = distText(m.s);
+    $("o-ring").textContent = "наводка на " + distText(m.sf);
+    var blur = Math.min(22, Math.max(0, m.c / COC - 1) * 1.2);
+    $("blurred").style.filter = "blur(" + blur.toFixed(2) + "px)";
+    var lights = lg.children;
+    for (var i = 0; i < lights.length; i++) {
+      lights[i].setAttribute("r", (3 + blur * 1.5).toFixed(1));
+      lights[i].setAttribute("opacity", Math.max(0.25, 1 / (1 + blur * 0.35)).toFixed(2));
+    }
+    var b = $("badge"); b.textContent = m.sharp ? "В фокусе" : "Мимо фокуса"; b.className = "badge" + (m.sharp ? " ok" : "");
+    $("r-d").textContent = fmt(m.d, 2) + " мм"; $("r-v").textContent = fmt(m.v, 2) + " мм";
+    $("r-sf").textContent = distText(m.sf); $("r-c").textContent = fmt(m.c * 1000, 0) + " мкм";
+    var diff = m.d - m.v, txt;
+    if (m.sharp) txt = "Матрица стоит в точке схождения лучей. Размытие " + fmt(m.c * 1000, 0) + " мкм меньше допустимых 30 мкм.";
+    else if (diff < 0) txt = "Матрица стоит на " + fmt(-diff, 2) + " мм ближе, чем нужно: лучи не успели сойтись. Линза наведена на " + distText(m.sf) + ", а предмет на " + distText(m.s) + ".";
+    else txt = "Матрица стоит на " + fmt(diff, 2) + " мм дальше, чем нужно: лучи уже сошлись и снова расходятся. Линза наведена на " + distText(m.sf) + ", а предмет на " + distText(m.s) + ".";
+    $("verdict").textContent = txt;
+    drawDof(m, dofOf(m)); drawAF(m);
+  }
+
+  /* ---------- Глубина резкости ---------- */
+  var showDof = true;
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function posOf(mm) { return Math.log(mm / SMIN) / Math.log(20) * 100; }
+  function dofOf(m) {
+    var H = m.f * m.f / (st.n * COC) + m.f, sf = m.sf, near, far;
+    if (!isFinite(sf) || sf > 1e8) { near = H - m.f; far = Infinity; }
+    else {
+      near = sf * (H - m.f) / (H + sf - 2 * m.f);
+      far = sf < H ? sf * (H - m.f) / (H - sf) : Infinity;
+    }
+    return { H: H, near: near, far: far };
+  }
+  function xLog(mm) {
+    if (!isFinite(mm) || mm > 1e8) return 690;
+    return clamp(40 + 620 * Math.log(mm / 300) / Math.log(100), 40, 660);
+  }
+  function drawDof(m, d) {
+    var xN = xLog(d.near), xF = xLog(d.far), xf = xLog(m.sf), xo = xLog(m.s);
+    var inside = m.s >= d.near && m.s <= d.far, col = inside ? "var(--cyan)" : "var(--coral)";
+    var h = "";
+    h += '<rect x="' + xN.toFixed(1) + '" y="60" width="' + Math.max(2, xF - xN).toFixed(1) + '" height="36" fill="var(--cyan)" fill-opacity="0.22" stroke="var(--cyan)" stroke-width="1.5"/>';
+    h += '<line x1="40" y1="96" x2="690" y2="96" stroke="var(--muted)" stroke-width="2"/>';
+    [[500, "0,5 м"], [1000, "1 м"], [2000, "2 м"], [5000, "5 м"], [10000, "10 м"], [30000, "30 м"], [1e9, "∞"]].forEach(function (t) {
+      var x = xLog(t[0]);
+      h += '<line x1="' + x.toFixed(1) + '" y1="96" x2="' + x.toFixed(1) + '" y2="104" stroke="var(--muted)" stroke-width="2"/>';
+      h += '<text class="sv-t" x="' + x.toFixed(1) + '" y="122" text-anchor="middle">' + t[1] + '</text>';
+    });
+    h += '<text class="sv-c" x="' + (xN - 4).toFixed(1) + '" y="54" text-anchor="end">' + distText(d.near) + '</text>';
+    h += '<text class="sv-c" x="' + (xF + 4).toFixed(1) + '" y="54" text-anchor="start">' + distText(d.far) + '</text>';
+    h += '<polygon points="' + xf.toFixed(1) + ',100 ' + (xf - 6).toFixed(1) + ',112 ' + (xf + 6).toFixed(1) + ',112" fill="var(--amber)"/>';
+    h += '<text class="sv-a" x="' + xf.toFixed(1) + '" y="146" text-anchor="middle">наводка ' + distText(m.sf) + '</text>';
+    h += '<line x1="' + xo.toFixed(1) + '" y1="34" x2="' + xo.toFixed(1) + '" y2="96" stroke="' + col + '" stroke-width="3"/>';
+    h += '<circle cx="' + xo.toFixed(1) + '" cy="26" r="7" fill="' + col + '"/>';
+    h += '<text class="sv-v" x="' + xo.toFixed(1) + '" y="12" text-anchor="middle" fill="' + col + '" style="fill:' + col + '">свеча ' + distText(m.s) + '</text>';
+    $("dofsvg").innerHTML = h;
+    $("d-near").textContent = distText(d.near);
+    $("d-far").textContent = distText(d.far);
+    $("d-total").textContent = isFinite(d.far) ? distText(d.far - d.near) : "до ∞";
+    $("d-h").textContent = distText(d.H);
+    $("dofverdict").textContent = inside
+      ? "Свеча на " + distText(m.s) + " лежит внутри зоны резкости, поэтому на снимке она резкая."
+      : "Свеча на " + distText(m.s) + " вне зоны резкости (" + distText(d.near) + " – " + distText(d.far) + "), поэтому она размыта. Сдвиньте наводку или закройте диафрагму.";
+    $("l-dof").textContent = "зона резкости " + distText(d.near) + " – " + distText(d.far);
+  }
+  $("dofbtn").addEventListener("click", function () {
+    showDof = !showDof; this.setAttribute("aria-pressed", showDof ? "true" : "false");
+  });
+  function dofNote(title) {
+    var m = calc(), d = dofOf(m);
+    $("dofnote").textContent = title + " Зона резкости: " + distText(d.near) + " – " + distText(d.far) + (isFinite(d.far) ? ", глубина " + distText(d.far - d.near) + "." : ", уходит в бесконечность.");
+  }
+  var DOFSC = [
+    { to: function () { return { f: 105, sPos: posOf(2000), n: 2, ring: ringFor(105, 2000) }; }, t: "Портрет: длинное фокусное и открытая диафрагма. Резким остаётся только лицо, фон мягкий." },
+    { to: function () { var H = 24 * 24 / (11 * COC) + 24; return { f: 24, sPos: posOf(3000), n: 11, ring: ringFor(24, H) }; }, t: "Пейзаж: широкий угол, f/11 и наводка на гиперфокальное расстояние. Резко всё от половины этого расстояния до бесконечности." },
+    { to: function () { return { f: 50, sPos: posOf(1000), n: 1.4, ring: ringFor(50, 1000) }; }, t: "Близко и при открытой диафрагме: зона резкости тоньше листа бумаги, наводку нужно ставить точно." }
+  ];
+  Array.prototype.forEach.call(document.querySelectorAll("[data-dof]"), function (b) {
+    b.addEventListener("click", function () {
+      stopHunt();
+      var sc = DOFSC[+b.getAttribute("data-dof")];
+      tween(sc.to(), 900, function () { dofNote(sc.t); });
+    });
+  });
+  $("hyper").addEventListener("click", function () {
+    stopHunt();
+    var H = st.f * st.f / (st.n * COC) + st.f;
+    tween({ ring: ringFor(st.f, H) }, 800, function () { dofNote("Наводка на гиперфокальное расстояние " + distText(H) + ": дальняя граница ушла в бесконечность, а ближняя вдвое ближе."); });
+  });
+
+  /* ---------- Автофокус ---------- */
+  function calcAt(pos) { var keep = st.ring; st.ring = pos; var m = calc(); st.ring = keep; return m; }
+  function contrastAt(pos) { var c = calcAt(pos).c; return 1 / (1 + Math.pow(c / 0.05, 2)); }
+  var hunt = { on: false, samples: [], log: [], done: false, n: 0 }, huntTimer = 0;
+  function forceRedraw() { lastSig = ""; }
+  function stopHunt() { if (hunt.on) { hunt.on = false; clearTimeout(huntTimer); hunt.log.push({ t: "Остановлено вручную", k: "" }); renderLog(); forceRedraw(); } }
+  function renderLog() {
+    var ol = $("aflog"); ol.textContent = "";
+    hunt.log.slice(-7).forEach(function (r) {
+      var li = document.createElement("li"); li.textContent = r.t; if (r.k) li.className = r.k; ol.appendChild(li);
+    });
+    $("afcstat").textContent = hunt.n ? "Измерений контраста: " + hunt.n + (hunt.done ? ". Фокус найден." : hunt.on ? ". Идёт поиск…" : "") : "";
+  }
+  function shake() {
+    stopHunt(); tweenId++;
+    var tgt = ringFor(st.f, sOf(st.sPos)), sign = tgt < 300 ? 1 : tgt > 700 ? -1 : (Math.random() < 0.5 ? -1 : 1);
+    var to = clamp(tgt + sign * 260, 0, 1000);
+    hunt = { on: false, samples: [], log: [{ t: "Фокус сбит: кольцо отодвинуто от верного положения", k: "" }], done: false, n: 0 };
+    tween({ ring: to }, 500, function () { forceRedraw(); renderLog(); });
+    renderLog();
+  }
+  function startHunt() {
+    stopHunt(); tweenId++;
+    var c0 = contrastAt(st.ring);
+    hunt = { on: true, pos: st.ring, step: 90, dir: 1, prev: c0, best: { pos: st.ring, c: c0 }, samples: [{ pos: st.ring, c: c0 }], log: [{ t: "Старт: контраст " + fmt(c0, 2), k: "" }], done: false, n: 1 };
+    renderLog(); forceRedraw();
+    huntTimer = setTimeout(huntStep, 350);
+  }
+  function huntStep() {
+    if (!hunt.on) return;
+    var p2 = clamp(hunt.pos + hunt.dir * hunt.step, 0, 1000), c2 = contrastAt(p2), up;
+    hunt.n++; hunt.samples.push({ pos: p2, c: c2 });
+    if (c2 > hunt.best.c) hunt.best = { pos: p2, c: c2 };
+    up = c2 > hunt.prev && p2 !== hunt.pos;
+    var dirTxt = hunt.dir > 0 ? "вперёд" : "назад";
+    if (up) hunt.log.push({ t: "Шаг " + fmt(hunt.step, 0) + " " + dirTxt + ": контраст " + fmt(c2, 2) + " вырос, идём дальше", k: "up" });
+    else { hunt.log.push({ t: "Шаг " + fmt(hunt.step, 0) + " " + dirTxt + ": контраст " + fmt(c2, 2) + " упал, разворот и шаг вдвое меньше", k: "down" }); hunt.dir = -hunt.dir; hunt.step = hunt.step / 2; }
+    hunt.pos = p2; hunt.prev = c2; st.ring = p2; syncInputs();
+    if (hunt.step < 1.2) {
+      hunt.on = false; hunt.done = true; st.ring = hunt.best.pos; syncInputs();
+      hunt.log.push({ t: "Готово: кольцо на лучшей точке, контраст " + fmt(hunt.best.c, 2), k: "up" });
+    } else huntTimer = setTimeout(huntStep, 330);
+    renderLog(); forceRedraw();
+  }
+  function drawContrast() {
+    var X = function (p) { return 50 + p * 0.57; }, Y = function (c) { return 210 - c * 190; };
+    var h = '<line x1="50" y1="210" x2="620" y2="210" stroke="var(--muted)" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="210" stroke="var(--muted)" stroke-width="2"/>';
+    h += '<text class="sv-t" x="620" y="232" text-anchor="end">положение кольца →</text><text class="sv-t" x="58" y="30">контраст</text>';
+    var d = "";
+    for (var p = 0; p <= 1000; p += 4) d += (p ? "L" : "M") + X(p).toFixed(1) + " " + Y(contrastAt(p)).toFixed(1);
+    h += '<path d="' + d + '" fill="none" stroke="var(--muted)" stroke-width="2" opacity="0.85"/>';
+    if (hunt.done) { var xp = X(hunt.best.pos); h += '<line x1="' + xp.toFixed(1) + '" y1="20" x2="' + xp.toFixed(1) + '" y2="210" stroke="var(--cyan)" stroke-dasharray="4 4"/>'; }
+    for (var i = 1; i < hunt.samples.length; i++) {
+      var a = hunt.samples[i - 1], b = hunt.samples[i];
+      h += '<line x1="' + X(a.pos).toFixed(1) + '" y1="' + Y(a.c).toFixed(1) + '" x2="' + X(b.pos).toFixed(1) + '" y2="' + Y(b.c).toFixed(1) + '" stroke="var(--amber)" stroke-width="1" opacity="0.5"/>';
+    }
+    hunt.samples.forEach(function (s, i) {
+      h += '<circle cx="' + X(s.pos).toFixed(1) + '" cy="' + Y(s.c).toFixed(1) + '" r="4" fill="var(--amber)"/>';
+      if (i < 12) h += '<text class="sv-a" x="' + (X(s.pos) + 6).toFixed(1) + '" y="' + (Y(s.c) - 8).toFixed(1) + '">' + (i + 1) + '</text>';
+    });
+    var cx = X(st.ring), cy = Y(contrastAt(st.ring));
+    h += '<line x1="' + cx.toFixed(1) + '" y1="20" x2="' + cx.toFixed(1) + '" y2="210" stroke="var(--cyan)" stroke-width="1.5" opacity="0.7"/><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="6" fill="none" stroke="var(--cyan)" stroke-width="2.5"/>';
+    $("afcsvg").innerHTML = h;
+  }
+  function drawPhase(m) {
+    var LX = 120, CY = 135, XI = 330, a = clamp(8 + 62 * (m.A / 75), 8, 70);
+    var XS = XI + 80 * Math.tanh((m.d - m.v) / 3), r = (XS - LX) / (XI - LX), p = 1 - r;
+    var yT = CY - a + a * r, yB = CY + a - a * r;
+    var h = '<line x1="10" y1="135" x2="430" y2="135" stroke="var(--line)" stroke-dasharray="5 5"/>';
+    h += '<circle cx="24" cy="135" r="5" fill="var(--amber)"/>';
+    h += '<path d="M' + LX + ' 55 Q' + (LX + 14) + ' 135 ' + LX + ' 215 Q' + (LX - 14) + ' 135 ' + LX + ' 55 Z" fill="rgba(94,230,210,0.14)" stroke="var(--cyan)" stroke-width="2"/>';
+    h += '<line x1="' + LX + '" y1="40" x2="' + LX + '" y2="' + (CY - a) + '" stroke="var(--fg)" stroke-width="6"/><line x1="' + LX + '" y1="' + (CY + a) + '" x2="' + LX + '" y2="230" stroke="var(--fg)" stroke-width="6"/>';
+    h += '<line x1="24" y1="135" x2="' + LX + '" y2="' + (CY - a) + '" stroke="var(--cyan)" stroke-width="2"/><line x1="24" y1="135" x2="' + LX + '" y2="' + (CY + a) + '" stroke="var(--amber)" stroke-width="2"/>';
+    h += '<line x1="' + LX + '" y1="' + (CY - a) + '" x2="' + XS.toFixed(1) + '" y2="' + yT.toFixed(1) + '" stroke="var(--cyan)" stroke-width="2"/><line x1="' + LX + '" y1="' + (CY + a) + '" x2="' + XS.toFixed(1) + '" y2="' + yB.toFixed(1) + '" stroke="var(--amber)" stroke-width="2"/>';
+    if (XS < XI) h += '<line x1="' + XS.toFixed(1) + '" y1="' + yT.toFixed(1) + '" x2="' + XI + '" y2="135" stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6"/><line x1="' + XS.toFixed(1) + '" y1="' + yB.toFixed(1) + '" x2="' + XI + '" y2="135" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6"/>';
+    h += '<circle cx="' + XI + '" cy="135" r="6" fill="none" stroke="var(--fg)" stroke-dasharray="3 3"/><text class="sv-t" x="' + XI + '" y="258" text-anchor="middle">точка схождения</text>';
+    h += '<line x1="' + XS.toFixed(1) + '" y1="70" x2="' + XS.toFixed(1) + '" y2="200" stroke="var(--fg)" stroke-width="4"/><text class="sv-v" x="' + XS.toFixed(1) + '" y="62" text-anchor="middle">матрица</text>';
+    h += '<circle cx="' + XS.toFixed(1) + '" cy="' + yT.toFixed(1) + '" r="5" fill="var(--cyan)"/><circle cx="' + XS.toFixed(1) + '" cy="' + yB.toFixed(1) + '" r="5" fill="var(--amber)"/>';
+    h += '<text class="sv-t" x="' + LX + '" y="258" text-anchor="middle">линза</text>';
+    /* датчики автофокуса */
+    var sh = clamp(p, -1.2, 1.2) * 50, cxA = 540 + sh, cxB = 540 - sh;
+    function bump(cx, base, color) {
+      var d = "";
+      for (var x = 450; x <= 630; x += 4) d += (x === 450 ? "M" : "L") + x + " " + (base - 40 * Math.exp(-Math.pow((x - cx) / 15, 2))).toFixed(1);
+      return '<line x1="450" y1="' + base + '" x2="630" y2="' + base + '" stroke="var(--line)"/><path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5"/>';
+    }
+    h += '<text class="sv-t" x="450" y="36">датчики автофокуса</text>';
+    h += bump(cxA, 90, "var(--cyan)") + '<text class="sv-c" x="450" y="106">изображение сверху</text>';
+    h += bump(cxB, 160, "var(--amber)") + '<text class="sv-a" x="450" y="176">изображение снизу</text>';
+    h += '<line x1="' + cxA.toFixed(1) + '" y1="196" x2="' + cxA.toFixed(1) + '" y2="236" stroke="var(--cyan)" stroke-width="2"/><line x1="' + cxB.toFixed(1) + '" y1="196" x2="' + cxB.toFixed(1) + '" y2="236" stroke="var(--amber)" stroke-width="2"/>';
+    h += '<text class="sv-v" x="540" y="256" text-anchor="middle">' + (Math.abs(p) < 0.012 ? "совпали: фокус" : "сдвиг " + fmt(Math.abs(p) * 100, 0) + "%") + '</text>';
+    $("afpsvg").innerHTML = h;
+    var need = m.v - m.d, ph = m.A * need / m.v, delta = need / eMax(m.f) * 1000;
+    $("afpnum").textContent = Math.abs(need) < 0.005
+      ? "Изображения совпали, мотор не нужен."
+      : "Изображения разошлись на " + fmt(Math.abs(ph), 2) + " мм на датчике. Команда мотору: " + (need > 0 ? "увеличить расстояние от линзы до матрицы на " : "уменьшить расстояние от линзы до матрицы на ") + fmt(Math.abs(need), 2) + " мм (" + (need > 0 ? "наводка ближе" : "наводка дальше") + ", кольцо на " + fmt(Math.abs(delta), 0) + " делений из 1000).";
+  }
+  function drawAF(m) { drawContrast(); drawPhase(m); }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-af]"), function (b) {
+    b.addEventListener("click", function () {
+      var mode = b.getAttribute("data-af");
+      Array.prototype.forEach.call(document.querySelectorAll("[data-af]"), function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      $("afc").hidden = mode !== "contrast"; $("afp").hidden = mode !== "phase";
+    });
+  });
+  $("afshake").addEventListener("click", shake);
+  $("afhunt").addEventListener("click", startHunt);
+  $("afp-shake").addEventListener("click", function () { shake(); $("afpstat").textContent = "Фокус сбит. Фазовый датчик уже видит разъезд изображений."; });
+  $("afp-go").addEventListener("click", function () {
+    stopHunt(); var m = calc();
+    $("afpstat").textContent = "Одно измерение и одно движение кольца.";
+    tween({ ring: ringFor(m.f, m.s) }, 650);
+  });
+
+  /* ---------- 3D ---------- */
+  var render3d = null;
+  function init3D() {
+    var T = window.THREE;
+    if (!T) throw new Error("three.js не загружен");
+    var stage = $("stage"), canvas = $("gl");
+    var renderer = new T.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputEncoding = T.sRGBEncoding;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+
+    var scene = new T.Scene();
+    scene.background = new T.Color(0x090C10);
+    scene.fog = new T.Fog(0x090C10, 30, 70);
+    var camera = new T.PerspectiveCamera(32, 1, 0.1, 200);
+
+    /* студийное окружение для отражений */
+    var envScene = new T.Scene(); envScene.background = new T.Color(0x0b0f14);
+    function panel(w, h, p, k, color) {
+      var m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color(color).multiplyScalar(k), side: T.DoubleSide }));
+      m.position.set(p[0], p[1], p[2]); m.lookAt(0, 0, 0); envScene.add(m);
+    }
+    panel(14, 5, [0, 9, 4], 9, 0xffffff); panel(6, 10, [-10, 2, 2], 5, 0xcfe3ff);
+    panel(5, 9, [10, 1, -3], 4, 0xffd9a0); panel(16, 3, [0, -3, -10], 3, 0xffffff);
+    var pm = new T.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(envScene, 0.03).texture;
+
+    var key = new T.DirectionalLight(0xffffff, 0.8); key.position.set(-6, 10, 8); scene.add(key);
+    var rim = new T.DirectionalLight(0xffb070, 0.6); rim.position.set(8, 4, -8); scene.add(rim);
+
+    function lathe(pts, seg) { return new T.LatheGeometry(pts.map(function (p) { return new T.Vector2(p[0], p[1]); }), seg); }
+    function gradTex(stops) {
+      var c = document.createElement("canvas"); c.width = c.height = 128;
+      var g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      stops.forEach(function (s) { gr.addColorStop(s[0], s[1]); });
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+      var t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
+    }
+    var glowTex = gradTex([[0, "rgba(255,255,255,1)"], [0.25, "rgba(255,255,255,0.45)"], [1, "rgba(255,255,255,0)"]]);
+    var discTex = gradTex([[0, "rgba(255,255,255,1)"], [0.72, "rgba(255,255,255,0.95)"], [1, "rgba(255,255,255,0)"]]);
+
+    var metalDark = new T.MeshStandardMaterial({ color: 0x1b2026, metalness: 0.9, roughness: 0.36, side: T.DoubleSide });
+    var metalMid = new T.MeshStandardMaterial({ color: 0x2a3037, metalness: 0.95, roughness: 0.3, side: T.DoubleSide });
+    var metalLight = new T.MeshStandardMaterial({ color: 0x80888f, metalness: 1, roughness: 0.28 });
+    var amberMat = new T.MeshStandardMaterial({ color: 0xffb84d, metalness: 1, roughness: 0.22 });
+    var blackMat = new T.MeshStandardMaterial({ color: 0x07090b, metalness: 0.2, roughness: 0.7, side: T.DoubleSide });
+
+    /* пол и скамья */
+    var floorTex = gradTex([[0, "rgba(80,100,125,0.55)"], [0.5, "rgba(40,55,72,0.22)"], [1, "rgba(9,12,16,0)"]]);
+    var floor = new T.Mesh(new T.PlaneGeometry(60, 40), new T.MeshBasicMaterial({ map: floorTex, transparent: true, depthWrite: false }));
+    floor.rotation.x = -Math.PI / 2; floor.position.set(-1, -2.85, 0); scene.add(floor);
+    var rail = new T.Mesh(new T.BoxGeometry(21.5, 0.22, 0.9), metalMid); rail.position.set(-0.75, -2.68, 0); scene.add(rail);
+    var ticks = new T.InstancedMesh(new T.BoxGeometry(0.018, 0.012, 0.2), new T.MeshBasicMaterial({ color: 0x7d8a98 }), 25);
+    var dm = new T.Object3D();
+    for (var ti = 0; ti < 25; ti++) {
+      dm.position.set(ti * 0.4, -2.565, 0.28); dm.scale.set(1, 1, ti % 5 === 0 ? 1.7 : 1); dm.updateMatrix(); ticks.setMatrixAt(ti, dm.matrix);
+    }
+    scene.add(ticks);
+
+    /* ось */
+    var axisGeo = new T.BufferGeometry().setFromPoints([new T.Vector3(-11, 0, 0), new T.Vector3(10, 0, 0)]);
+    var axis = new T.Line(axisGeo, new T.LineDashedMaterial({ color: 0x3a4654, dashSize: 0.2, gapSize: 0.2 }));
+    axis.computeLineDistances(); scene.add(axis);
+
+    /* линза и барабан */
+    var lens = new T.Group(); scene.add(lens);
+    var fb = new T.Mesh(lathe([[1.95, -1.3], [2.28, -1.3], [2.28, 0.15], [1.95, 0.15], [1.95, -1.3]], 96), metalDark);
+    fb.rotation.z = -Math.PI / 2; lens.add(fb);
+    var ring1 = new T.Mesh(new T.TorusGeometry(2.1, 0.035, 12, 96), amberMat); ring1.rotation.y = Math.PI / 2; ring1.position.x = -1.28; lens.add(ring1);
+    var rb = new T.Mesh(lathe([[1.9, 1.15], [2.2, 1.15], [2.2, 1.95], [1.9, 1.95], [1.9, 1.15]], 96), metalDark);
+    rb.rotation.z = -Math.PI / 2; lens.add(rb);
+    var mount = new T.Mesh(new T.TorusGeometry(2.0, 0.07, 12, 96), amberMat); mount.rotation.y = Math.PI / 2; mount.position.x = 1.95; lens.add(mount);
+
+    var focusRing = new T.Group(); focusRing.position.x = 0.65; lens.add(focusRing);
+    var ringMat = metalMid.clone();
+    var cyl = new T.Mesh(new T.CylinderGeometry(2.36, 2.36, 1.0, 96, 1, true), ringMat); cyl.rotation.z = -Math.PI / 2; focusRing.add(cyl);
+    var KN = 72, knurl = new T.InstancedMesh(new T.BoxGeometry(0.9, 0.09, 0.1), metalDark, KN), kd = new T.Object3D();
+    for (var ki = 0; ki < KN; ki++) {
+      var ph = ki / KN * Math.PI * 2;
+      kd.position.set(0, 2.39 * Math.cos(ph), 2.39 * Math.sin(ph)); kd.rotation.set(ph, 0, 0); kd.updateMatrix(); knurl.setMatrixAt(ki, kd.matrix);
+    }
+    focusRing.add(knurl);
+    var mark = new T.Mesh(new T.BoxGeometry(0.7, 0.05, 0.14), amberMat); mark.position.set(0, 2.44, 0); focusRing.add(mark);
+
+    /* стекло */
+    var GR = 1.7, GN = 40, gp = [], tc = 0.5, edge = 0.08, gi, r;
+    for (gi = 0; gi <= GN; gi++) { r = GR * gi / GN; gp.push([r, -(edge + tc * (1 - (r / GR) * (r / GR)))]); }
+    for (gi = GN; gi >= 0; gi--) { r = GR * gi / GN; gp.push([r, edge + tc * (1 - (r / GR) * (r / GR))]); }
+    var glass = new T.Mesh(lathe(gp, 96), new T.MeshPhysicalMaterial({
+      color: 0xcfe6ff, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.3, envMapIntensity: 1.8,
+      clearcoat: 1, clearcoatRoughness: 0.03, depthWrite: false, side: T.DoubleSide
+    }));
+    glass.rotation.z = -Math.PI / 2; lens.add(glass);
+    var coat = new T.Mesh(new T.RingGeometry(GR - 0.06, GR, 96), new T.MeshBasicMaterial({ color: 0x7a5cff, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false }));
+    coat.rotation.y = Math.PI / 2; coat.position.x = -0.6; lens.add(coat);
+
+    var apMesh = null, apLast = -1;
+    function setAperture(rad) {
+      if (Math.abs(rad - apLast) < 1e-4) return;
+      apLast = rad;
+      if (apMesh) { lens.remove(apMesh); apMesh.geometry.dispose(); }
+      apMesh = new T.Mesh(new T.RingGeometry(Math.max(rad, 0.05), 1.95, 9), blackMat);
+      apMesh.rotation.y = Math.PI / 2; apMesh.position.x = -0.04; lens.add(apMesh);
+    }
+    var lstand = new T.Mesh(new T.BoxGeometry(1.4, 0.3, 1.0), metalLight); lstand.position.set(0.3, -2.42, 0); scene.add(lstand);
+
+    /* каретка матрицы */
+    var car = new T.Group(); scene.add(car);
+    var housingMat = metalDark.clone();
+    var housing = new T.Mesh(new T.BoxGeometry(1.0, 3.2, 3.6), housingMat); housing.position.x = 0.58; car.add(housing);
+    var column = new T.Mesh(new T.BoxGeometry(0.6, 0.7, 0.6), metalMid); column.position.set(0.58, -1.935, 0); car.add(column);
+    var cbase = new T.Mesh(new T.BoxGeometry(1.1, 0.3, 1.2), metalLight); cbase.position.set(0.58, -2.42, 0); car.add(cbase);
+    var bezel = new T.Mesh(new T.BoxGeometry(0.08, 1.5, 2.1), blackMat); bezel.position.x = 0.06; car.add(bezel);
+    var sensorMat = new T.MeshStandardMaterial({ color: 0x16352f, emissive: 0x0f6a58, emissiveIntensity: 0.4, metalness: 0.6, roughness: 0.3 });
+    var sensor = new T.Mesh(new T.BoxGeometry(0.05, 0.96, 1.44), sensorMat); car.add(sensor);
+    var sframe = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(0.06, 0.98, 1.46)), new T.LineBasicMaterial({ color: 0xffb84d })); car.add(sframe);
+
+    /* предмет: свеча */
+    var obj = new T.Group(); scene.add(obj);
+    var PY = 1.38;
+    var pole = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 3.77, 12), metalLight); pole.position.y = -0.685; obj.add(pole);
+    var waxMat = new T.MeshStandardMaterial({ color: 0xefe6d4, roughness: 0.6 });
+    var wax = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.55, 24), waxMat); wax.position.y = 0.95; obj.add(wax);
+    var flame = new T.Mesh(new T.SphereGeometry(1, 20, 16), new T.MeshBasicMaterial({ color: 0xffd08a })); flame.scale.set(0.085, 0.17, 0.085); flame.position.y = PY; obj.add(flame);
+    var spriteP = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffb84d, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); spriteP.scale.set(1.5, 1.5, 1); spriteP.position.y = PY; obj.add(spriteP);
+    var hitObj = new T.Mesh(new T.CylinderGeometry(0.45, 0.45, 4.2, 12), new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); hitObj.position.y = -0.5; obj.add(hitObj);
+
+    /* лучи */
+    var RINGS = [[0, 1], [0.38, 8], [0.7, 14], [1, 20]], QS = [];
+    RINGS.forEach(function (rg) { for (var i = 0; i < rg[1]; i++) { var a = i / rg[1] * Math.PI * 2 + 0.3 * rg[0]; QS.push([rg[0] * Math.cos(a), rg[0] * Math.sin(a)]); } });
+    var NR = QS.length;
+    function segs(c0, c1, op) {
+      var g = new T.BufferGeometry(), p = new Float32Array(NR * 6), c = new Float32Array(NR * 6);
+      for (var i = 0; i < NR; i++) { c.set(c0, i * 6); c.set(c1, i * 6 + 3); }
+      g.setAttribute("position", new T.BufferAttribute(p, 3)); g.setAttribute("color", new T.BufferAttribute(c, 3));
+      var l = new T.LineSegments(g, new T.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false }));
+      l.frustumCulled = false; scene.add(l); return l;
+    }
+    var rFront = segs([0.55, 0.4, 0.18], [1, 0.78, 0.4], 0.8);
+    var rBack = segs([1, 0.78, 0.4], [1, 0.93, 0.75], 0.9);
+    var rExt = segs([0.5, 0.38, 0.2], [0.5, 0.38, 0.2], 0.35);
+
+    var RIM = 64;
+    var fanG = new T.BufferGeometry(), fanP = new Float32Array((RIM + 1) * 3), fanI = [];
+    for (var fi = 0; fi < RIM; fi++) fanI.push(0, 1 + fi, 1 + (fi + 1) % RIM);
+    fanG.setAttribute("position", new T.BufferAttribute(fanP, 3)); fanG.setIndex(fanI);
+    var coneMat = new T.MeshBasicMaterial({ color: 0xffb84d, transparent: true, opacity: 0.07, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
+    var fan = new T.Mesh(fanG, coneMat); fan.frustumCulled = false; scene.add(fan);
+    var bandG = new T.BufferGeometry(), bandP = new Float32Array(RIM * 2 * 3), bandI = [];
+    for (var bi = 0; bi < RIM; bi++) {
+      var a0 = 2 * bi, b0 = a0 + 1, a1 = 2 * ((bi + 1) % RIM), b1 = a1 + 1;
+      bandI.push(a0, b0, a1, b0, b1, a1);
+    }
+    bandG.setAttribute("position", new T.BufferAttribute(bandP, 3)); bandG.setIndex(bandI);
+    var band = new T.Mesh(bandG, coneMat); band.frustumCulled = false; scene.add(band);
+
+    var spriteI = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xfff1c8, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); spriteI.scale.set(0.7, 0.7, 1); scene.add(spriteI);
+    var spot = new T.Mesh(new T.CircleGeometry(1, 48), new T.MeshBasicMaterial({ map: discTex, color: 0xff6b5e, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    spot.rotation.y = -Math.PI / 2; scene.add(spot);
+
+    /* зона резкости: голубой слой и плоскость наводки */
+    var slabBox = new T.BoxGeometry(1, 5.4, 3.4);
+    var slab = new T.Mesh(slabBox, new T.MeshBasicMaterial({ color: 0x5ee6d2, transparent: true, opacity: 0.1, blending: T.AdditiveBlending, depthWrite: false }));
+    var slabEdges = new T.LineSegments(new T.EdgesGeometry(slabBox), new T.LineBasicMaterial({ color: 0x5ee6d2, transparent: true, opacity: 0.6 }));
+    var fplane = new T.Mesh(new T.PlaneGeometry(3.4, 5.4), new T.MeshBasicMaterial({ color: 0xffb84d, transparent: true, opacity: 0.18, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    fplane.rotation.y = Math.PI / 2;
+    scene.add(slab); scene.add(slabEdges); scene.add(fplane);
+    function mapX(sMm) {
+      if (!isFinite(sMm) || sMm > 1e8) return -11.2;
+      return -(5 + 5 * clamp(Math.log(sMm / SMIN) / Math.log(20), -0.4, 1.15));
+    }
+
+    /* камера */
+    var VIEWS = { side: [0, Math.PI / 2], iso: [0.62, 1.25], top: [0.0, 0.28] };
+    var cam = { az: 0.62, pol: 1.25, R: 20, tx: -1.0, ty: -0.1 }, camTo = null, touched = false, dragging = false, lx = 0, ly = 0, clock0 = performance.now();
+    function fitR() { var asp = stage.clientWidth / Math.max(1, stage.clientHeight); return 20 * Math.max(1, 1.75 / asp); }
+    function placeCamera(extraAz) {
+      var az = cam.az + (extraAz || 0), sp = Math.sin(cam.pol);
+      camera.position.set(cam.tx + cam.R * sp * Math.sin(az), cam.ty + cam.R * Math.cos(cam.pol), cam.R * sp * Math.cos(az));
+      camera.lookAt(cam.tx, cam.ty, 0);
+    }
+    function setSize() {
+      var w = stage.clientWidth, h = stage.clientHeight;
+      renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); cam.R = fitR();
+    }
+    if (window.ResizeObserver) new ResizeObserver(setSize).observe(stage); else window.addEventListener("resize", setSize);
+    setSize();
+
+    /* прямое управление: кольцо линзы, матрица, свеча */
+    var ray = new T.Raycaster(), ndc = new T.Vector2(), mode = null, hover = null, grabX = 0, ringAng = 0;
+    var camDir = new T.Vector3(), plane = new T.Plane(), hitP = new T.Vector3(), vN = new T.Vector3(), vO = new T.Vector3();
+    var curXs = 0, curXo = -8;
+    var PICK = { ring: [cyl, mark], sensor: [housing, bezel, sensor, column, cbase], object: [hitObj, wax, pole, flame] }, pickList = [];
+    Object.keys(PICK).forEach(function (k) { PICK[k].forEach(function (o) { o.userData.part = k; pickList.push(o); }); });
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function setRay(e) {
+      var r = canvas.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+    }
+    function pick(e) { setRay(e); var h = ray.intersectObjects(pickList, false); return h.length ? h[0].object.userData.part : null; }
+    function axisPlane() {
+      camera.getWorldDirection(camDir);
+      var ny = camDir.y, nz = camDir.z, l = Math.sqrt(ny * ny + nz * nz);
+      if (l < 0.2) { ny = 0; nz = 1; l = 1; }
+      plane.setFromNormalAndCoplanarPoint(vN.set(0, ny / l, nz / l), vO.set(0, 0, 0));
+    }
+    function setHover(p) {
+      if (p === hover) return; hover = p;
+      ringMat.emissive.setHex(p === "ring" ? 0x6b4208 : 0x000000);
+      housingMat.emissive.setHex(p === "sensor" ? 0x0f4f48 : 0x000000);
+      waxMat.emissive.setHex(p === "object" ? 0x6b4208 : 0x000000);
+      canvas.style.cursor = p === "ring" ? "grab" : p ? "ew-resize" : "grab";
+    }
+    canvas.addEventListener("pointerdown", function (e) {
+      touched = true; camTo = null; lx = e.clientX; ly = e.clientY; dragging = true;
+      try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+      var part = pick(e);
+      mode = "orbit";
+      if (!part) return;
+      stopHunt(); tweenId++; setHover(part); mode = part;
+      if (part === "ring") {
+        camera.getWorldDirection(camDir);
+        if (Math.abs(camDir.x) > 0.3) {
+          plane.setFromNormalAndCoplanarPoint(vN.set(1, 0, 0), vO.set(0.65, 0, 0));
+          if (ray.ray.intersectPlane(plane, hitP)) { ringAng = Math.atan2(hitP.z, hitP.y); mode = "ringA"; } else mode = "ringL";
+        } else mode = "ringL";
+      } else {
+        axisPlane();
+        if (ray.ray.intersectPlane(plane, hitP)) grabX = hitP.x - (part === "sensor" ? curXs : curXo); else mode = "orbit";
+      }
+    });
+    canvas.addEventListener("pointermove", function (e) {
+      if (!dragging) { if (e.pointerType === "mouse") setHover(pick(e)); return; }
+      if (mode === "orbit") {
+        cam.az -= (e.clientX - lx) * 0.006; cam.pol = clamp(cam.pol - (e.clientY - ly) * 0.005, 0.2, 1.75);
+        markView(null);
+      } else if (mode === "ringA") {
+        setRay(e);
+        if (ray.ray.intersectPlane(plane, hitP)) {
+          var a = Math.atan2(hitP.z, hitP.y), dl = a - ringAng;
+          while (dl > Math.PI) dl -= 2 * Math.PI; while (dl < -Math.PI) dl += 2 * Math.PI;
+          ringAng = a; st.ring = clamp(st.ring + dl / 5.4 * 1000, 0, 1000);
+        }
+      } else if (mode === "ringL") {
+        st.ring = clamp(st.ring - (e.clientY - ly) * 3.5, 0, 1000);
+      } else if (mode === "sensor") {
+        setRay(e);
+        if (ray.ray.intersectPlane(plane, hitP)) {
+          var mm = calc(), off = clamp(hitP.x - grabX - mm.v * U, -3.0, 3.0);
+          var dv = 3.2 * Math.atanh(off / 3.2) / (GAIN * U);
+          st.ring = clamp((mm.v + dv - st.f) / eMax(st.f) * 1000, 0, 1000);
+        }
+      } else if (mode === "object") {
+        setRay(e);
+        if (ray.ray.intersectPlane(plane, hitP)) st.sPos = clamp((-(hitP.x - grabX) - 5) / 5, 0, 1) * 100;
+      }
+      lx = e.clientX; ly = e.clientY;
+      if (mode !== "orbit") syncInputs();
+    });
+    function endDrag(e) { dragging = false; mode = null; if (!e || e.pointerType !== "mouse") setHover(null); }
+    canvas.addEventListener("pointerup", endDrag); canvas.addEventListener("pointercancel", endDrag);
+    canvas.addEventListener("pointerleave", function (e) { if (!dragging) setHover(null); });
+    function markView(name) {
+      Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-view") === name ? "true" : "false"); });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) {
+      b.addEventListener("click", function () { var n = b.getAttribute("data-view"); camTo = { az: VIEWS[n][0], pol: VIEWS[n][1] }; touched = true; markView(n); });
+    });
+
+    /* подписи */
+    var labels = [
+      { el: $("l-obj"), pos: new T.Vector3() }, { el: $("l-lens"), pos: new T.Vector3() },
+      { el: $("l-sens"), pos: new T.Vector3() }, { el: $("l-img"), pos: new T.Vector3() }, { el: $("l-dof"), pos: new T.Vector3() }
+    ];
+    var tmp = new T.Vector3();
+    function placeLabels() {
+      var w = stage.clientWidth, h = stage.clientHeight, pts = [];
+      labels.forEach(function (L) {
+        tmp.copy(L.pos).project(camera);
+        var x = (tmp.x * 0.5 + 0.5) * w, y = (-tmp.y * 0.5 + 0.5) * h;
+        pts.push([x, y]);
+        L.el.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) translate(-50%,-100%)";
+        L.el.style.visibility = tmp.z < 1 ? "visible" : "hidden";
+      });
+      var dx = pts[3][0] - pts[2][0], dy = pts[3][1] - pts[2][1];
+      labels[3].el.style.visibility = Math.sqrt(dx * dx + dy * dy) > 90 ? labels[3].el.style.visibility : "hidden";
+      if (!showDof) labels[4].el.style.visibility = "hidden";
+    }
+
+    var tmpV = new T.Vector3();
+    function frame(now) {
+      var t = (now - clock0) / 1000, m = calc();
+      updateDom(m);
+
+      var rap = m.A / 2 * U;
+      var xi = m.v * U;
+      var off = 3.2 * Math.tanh(GAIN * (m.d - m.v) * U / 3.2);
+      var xs = xi + off, k = xs / xi;
+      var tObj = Math.log(m.s / SMIN) / Math.log(20), xo = -(5 + 5 * tObj);
+      var Iy = -PY * (m.v / m.s);
+
+      setAperture(rap);
+      focusRing.rotation.x = st.ring / 1000 * 5.4;
+      obj.position.x = xo; curXo = xo; curXs = xs;
+      car.position.x = xs; cbase.position.x = 0.58;
+      var fl = reduce ? 1 : 1 + 0.07 * Math.sin(t * 13) + 0.04 * Math.sin(t * 7.3);
+      flame.scale.set(0.085, 0.17 * fl, 0.085); spriteP.scale.setScalar(1.5 * (hover === "object" ? 1.3 : 1) * (reduce ? 1 : 0.96 + 0.05 * Math.sin(t * 11)));
+
+      /* лучи */
+      var pF = rFront.geometry.attributes.position.array, pB = rBack.geometry.attributes.position.array, pE = rExt.geometry.attributes.position.array;
+      var Px = xo, Py = PY, i, qy, qz, ex, ey, ez;
+      for (i = 0; i < NR; i++) {
+        qy = QS[i][0] * rap; qz = QS[i][1] * rap;
+        ex = xs; ey = qy + (Iy - qy) * k; ez = qz + (0 - qz) * k;
+        pF[i * 6] = Px; pF[i * 6 + 1] = Py; pF[i * 6 + 2] = 0; pF[i * 6 + 3] = 0; pF[i * 6 + 4] = qy; pF[i * 6 + 5] = qz;
+        pB[i * 6] = 0; pB[i * 6 + 1] = qy; pB[i * 6 + 2] = qz; pB[i * 6 + 3] = ex; pB[i * 6 + 4] = ey; pB[i * 6 + 5] = ez;
+        if (k < 1) { pE[i * 6] = ex; pE[i * 6 + 1] = ey; pE[i * 6 + 2] = ez; pE[i * 6 + 3] = xi; pE[i * 6 + 4] = Iy; pE[i * 6 + 5] = 0; }
+        else { pE[i * 6] = pE[i * 6 + 3] = 0; pE[i * 6 + 1] = pE[i * 6 + 4] = 0; pE[i * 6 + 2] = pE[i * 6 + 5] = 0; }
+      }
+      rFront.geometry.attributes.position.needsUpdate = true; rBack.geometry.attributes.position.needsUpdate = true; rExt.geometry.attributes.position.needsUpdate = true;
+      fanP[0] = Px; fanP[1] = Py; fanP[2] = 0;
+      for (i = 0; i < RIM; i++) {
+        var aa = i / RIM * Math.PI * 2, cy = Math.cos(aa) * rap, cz = Math.sin(aa) * rap;
+        fanP[(1 + i) * 3] = 0; fanP[(1 + i) * 3 + 1] = cy; fanP[(1 + i) * 3 + 2] = cz;
+        bandP[i * 6] = 0; bandP[i * 6 + 1] = cy; bandP[i * 6 + 2] = cz;
+        bandP[i * 6 + 3] = xs; bandP[i * 6 + 4] = cy + (Iy - cy) * k; bandP[i * 6 + 5] = cz + (0 - cz) * k;
+      }
+      fanG.attributes.position.needsUpdate = true; bandG.attributes.position.needsUpdate = true;
+
+      spriteI.position.set(xi, Iy, 0);
+      spriteI.scale.setScalar(m.sharp ? 0.9 : 0.55);
+      var sr = Math.max(rap * Math.abs(1 - k), 0.04);
+      spot.position.set(xs - 0.035, Iy * k, 0); spot.scale.set(sr, sr, 1);
+      spot.material.color.set(m.sharp ? 0x7cffe0 : 0xff6b5e);
+      sensorMat.emissiveIntensity = m.sharp ? 1.5 : 0.35;
+
+      var dd = dofOf(m), xN = mapX(dd.near), xF = mapX(dd.far);
+      slab.scale.x = slabEdges.scale.x = Math.max(0.03, Math.abs(xN - xF));
+      slab.position.set((xN + xF) / 2, 0.1, 0); slabEdges.position.copy(slab.position);
+      fplane.position.set(mapX(m.sf), 0.1, 0);
+      slab.visible = slabEdges.visible = fplane.visible = showDof;
+
+      /* камера */
+      if (camTo) {
+        cam.az += (camTo.az - cam.az) * 0.12; cam.pol += (camTo.pol - cam.pol) * 0.12;
+        if (Math.abs(camTo.az - cam.az) < 0.002 && Math.abs(camTo.pol - cam.pol) < 0.002) camTo = null;
+      }
+      placeCamera(!touched && !reduce ? 0.07 * Math.sin(t * 0.3) : 0);
+
+      labels[0].pos.set(xo, PY + 0.7, 0); labels[1].pos.set(0, 2.75, 0);
+      labels[4].pos.set((xN + xF) / 2, 3.2, 0);
+      labels[2].pos.set(xs + 0.5, 1.9, 0); labels[3].pos.set(xi, Iy - 0.2, 0).add(tmpV.set(0, 0.9, 0));
+      placeLabels();
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* плавный переход по разделам */
+  Array.prototype.forEach.call(document.querySelectorAll(".nav a"), function (a) {
+    a.addEventListener("click", function (e) {
+      var id = a.getAttribute("href").slice(1), el = document.getElementById(id);
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      el.classList.remove("arrive"); void el.offsetWidth; el.classList.add("arrive");
+      setTimeout(function () { el.classList.remove("arrive"); }, 2200);
+    });
+  });
+
+  st.ring = ringFor(50, 1200);
+  syncInputs();
+  updateDom(calc());
+  try { init3D(); }
+  catch (err) {
+    $("nogl").style.display = "grid";
+    $("labels").style.display = "none";
+    (function loop() { updateDom(calc()); requestAnimationFrame(loop); })();
+  }
+})();
+</script>
+
+</body></html>
